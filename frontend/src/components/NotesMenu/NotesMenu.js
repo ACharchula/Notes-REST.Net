@@ -29,10 +29,26 @@ class NotesMenu extends PureComponent {
     }
 
     componentDidMount() {
-        const category = this.category();
-        const from = this.from();
-        const to = this.to();
-        const currentPage = this.currentPage();
+        let category = this.category();
+        let from = this.from();
+        let to = this.to();
+        let currentPage = this.currentPage();
+
+        if (from === null) {
+            from = '';
+        }
+
+        if (to === null) {
+            to = '';
+        }
+
+        if (currentPage === null) {
+            currentPage = 1;
+        }
+
+        if (category === null) {
+            category = "All"
+        }
 
         this.getNotes(from, to, category, currentPage);
     }
@@ -70,9 +86,9 @@ class NotesMenu extends PureComponent {
             localStorage.setItem('toFilter', to);
             localStorage.setItem('currentPage', res.data.data.pager.currentPage);
 
-            if (category !== 'All' && !res.data.data.categories.includes(category)) {
-                this.getNotes(from, to, 'All', 1)
-            }
+            // if (category !== 'All' && !res.data.data.categories.includes(category)) {
+            //     this.getNotes(from, to, 'All', 1)
+            // }
         }).catch(err => {
             console.log(err);
         })
@@ -80,7 +96,7 @@ class NotesMenu extends PureComponent {
 
     delete(id) {
         Axios.delete(`${api}/${id}`).then(res => {
-            if (res.data !== 'Deleted') {
+            if (res.status !== 200) {
                 alert(res.data)
             } else {
                 this.getNotes(this.from(), this.to(), this.category(), this.currentPage());
@@ -197,7 +213,7 @@ class NotesMenu extends PureComponent {
                     </Link>
                     <ul className="to-right pagination">
                         <li className="page-item"><button type="button" disabled={this.state.currentPage === 1} className="page-link" onClick={() => this.previousPage()}>Previous</button></li>
-                        <li className="page-item page-link">{this.state.currentPage}/{this.state.allPages}</li>
+                        <li className="page-item page-link">{this.state.allPages === 0 ? 0 : this.state.currentPage}/{this.state.allPages}</li>
                         <li className="page-item"><button type="button" disabled={this.state.currentPage === this.state.allPages} className="page-link" onClick={() => this.nextPage()}>Next</button></li>
                     </ul>
                 </div>

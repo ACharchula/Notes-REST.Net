@@ -26,7 +26,7 @@ namespace backend.Controllers {
                 var notes = ctx.Note.Include(i => i.NoteCategories)
                     .ThenInclude(i => i.Category)
                     .AsNoTracking().ToList();
-
+                
                 if (category != null && category != "All") {
                     page = 1;
                     notes = notes.Where(n => n.NoteCategories.Any(nc => nc.Category.Name.Equals(category))).ToList();
@@ -44,8 +44,12 @@ namespace backend.Controllers {
 
                 var categories = ctx.Category.Select(c => c.Name).ToList();
                 var notesData = notes.Select(n => new NoteData(n)).ToList();
+                var TotalPages = (int) Math.Ceiling(notesData.Count() / (double) PAGE_SIZE);  
+                if (TotalPages < page) {
+                    page--;
+                }
                 var pageOfNotes = notesData.Skip((page - 1) * PAGE_SIZE).Take(PAGE_SIZE).ToList(); 
-                var TotalPages = (int) Math.Ceiling(notesData.Count() / (double) PAGE_SIZE);      
+
                 return Ok(new { data = new {notes = pageOfNotes, categories = categories, pager = new {currentPage = page, totalPages = TotalPages}}});
             }
         }
@@ -61,7 +65,7 @@ namespace backend.Controllers {
                 .FirstOrDefault();
 
                 if (note == null) {
-                    return NotFound();
+                    return StatusCode(404, "Note has been deleted by another user");
                 } else {
                     return Ok( new { note = new NoteData(note)});
                 }
@@ -110,7 +114,6 @@ namespace backend.Controllers {
         }
 
         [HttpPut("{id}")]
-        [Route("update_note")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult update(int id, [FromBody] NoteData note) {
@@ -120,12 +123,12 @@ namespace backend.Controllers {
                 .ThenInclude(nc => nc.Category)
                 .FirstOrDefault();
 
-                if (ctx.Note.Any(n => n.Title == note.Title)) {
+                if (ctx.Note.Any(n => n.Title == note.Title && n.NoteID != id)) {
                     return StatusCode(400, "Note with title - " + note.Title + " - already exists");
                 }
 
                 if (original == null) {
-                    return NotFound();
+                    return StatusCode(404, "Note has been deleted by another user");
                 }
 
                 ctx.Entry(original).Property("Timestamp").OriginalValue = note.Timestamp;
@@ -133,6 +136,7 @@ namespace backend.Controllers {
                 original.Title = note.Title;
                 original.Date = note.Date;
                 original.Description = note.Description;
+                original.isMarkdown = note.isMarkdown;
 
                 original.NoteCategories = preprareNoteCategory(ctx, note.Categories, original);
                 try {
@@ -142,7 +146,7 @@ namespace backend.Controllers {
                     var databaseEntry = exceptionEntry.GetDatabaseValues();
 
                     if (databaseEntry == null) {
-                        return StatusCode(500, "Note has been deleted by another user");
+                        return StatusCode(404, "Note has been deleted by another user");
                     } else {
                         return StatusCode(403, "The record you attempted to edit "
                         + "was modified by another user after you got the original value. The "
@@ -161,11 +165,15 @@ namespace backend.Controllers {
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult delete(int id) {
             using (var ctx = new NotesContext()) {
-                var original = ctx.Note.Where(n => n.NoteID == id)
+                var original = ctx.Note.Where(n => n.NoteID == id).Include(n => n.NoteCategories)
                     .FirstOrDefault();
 
                 if (original == null) {
                     return Ok();
+                }
+                
+                foreach(NoteCategory nc in original.NoteCategories) {
+                    ctx.NoteCategory.Remove(nc);
                 }
 
                 ctx.Note.Remove(original);

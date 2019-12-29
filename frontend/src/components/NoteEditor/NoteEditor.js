@@ -17,6 +17,7 @@ class NoteEditor extends PureComponent {
             content: '',
             categories: [],
             category: '',
+            timestamp: '',
             oldID: this.props.match.params.id || ''
         }
 
@@ -33,18 +34,29 @@ class NoteEditor extends PureComponent {
     componentDidMount() {
         if (this.state.oldID !== '') {
             axios.get(`${api}/${this.state.oldID}`).then(res => {
-                const categories = res.data.note.categories[0] === '' ? [] : res.data.note.categories;
-                const markdownBoolean = res.data.note.isMarkdown === 1;
-                console.log(res.data)
-                this.setState({
-                    title: res.data.note.title,
-                    date: moment(res.data.note.date).format('YYYY-MM-DD'),
-                    categories: categories,
-                    markdown: markdownBoolean,
-                    content: res.data.note.description
-                })
+
+                if (res.status === 200) {
+                    const categories = res.data.note.categories[0] === '' ? [] : res.data.note.categories;
+                    const markdownBoolean = res.data.note.isMarkdown === 1;
+                    console.log(res.data)
+                    this.setState({
+                        title: res.data.note.title,
+                        date: moment(res.data.note.date).format('YYYY-MM-DD'),
+                        categories: categories,
+                        markdown: markdownBoolean,
+                        content: res.data.note.description,
+                        timestamp: res.data.note.timestamp
+                    })
+                } else {
+                    alert(res.data)
+                }
             }).catch(err => {
-                console.log(err);
+                if (err.response.status === 404) {
+                    alert('Note has been deleted');
+                    this.props.history.push('/');
+                } else {
+                    console.log(err);
+                }
             })
         }
     }
@@ -123,29 +135,48 @@ class NoteEditor extends PureComponent {
                 Description: this.state.content,
                 Categories: this.state.categories
             }).then(res => {
-                if (res.data !== 'Saved') {
-                    alert(res.data)
-                } else {
+                if (res.status === 200) {
                     this.props.history.push('/');
+                } else {
+                    alert(res.data)
                 }
             }).catch(err => {
-                console.log(err);
+                if (err.response.status === 400) {
+                    alert(err.response.data)
+                } else if (err.response.status === 500) {
+                    alert(err.response.data)
+                } else {
+                    console.log(err.response.data);
+                }
             })
         } else if (this.props.mode === 'edit') {
-            axios.put(`${api}/update_note/${this.state.oldID}`, {
+            axios.put(`${api}/${this.state.oldID}`, {
                 title: this.state.title,
                 date: this.state.date,
-                markdown: markdownShort,
-                content: this.state.content,
-                categories: this.state.categories
+                isMarkdown: markdownShort,
+                Description: this.state.content,
+                categories: this.state.categories,
+                timestamp: this.state.timestamp
             }).then(res => {
-                if (res.data !== 'Updated') {
-                    alert(res.data)
-                } else {
+                if (res.status === 200) {
                     this.props.history.push('/');
+                } else {
+                    alert(res.data)
                 }
             }).catch(err => {
-                console.log(err);
+                if (err.response.status === 400) {
+                    alert(err.response.data);
+                } else if (err.response.status === 404) {
+                    alert (err.response.data);
+                    this.props.history.push('/');
+                } else if (err.response.status === 403) {
+                    alert(err.response.data)
+                    this.componentDidMount();
+                } else  if (err.response.status === 500) {
+                    alert(err.response.data)
+                } else {
+                    console.log(err.response.data);
+                }
             })
         }
     }
